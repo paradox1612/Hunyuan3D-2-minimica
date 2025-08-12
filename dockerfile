@@ -46,4 +46,4 @@ ENV HY3DGEN_MODELS=/app/model-cache
 EXPOSE 8000
 
 # Default command
-CMD ["python3", "generate_mv_enhanced.py"]
+CMD ["python3", "api.py"]
