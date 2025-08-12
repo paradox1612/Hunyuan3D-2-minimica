@@ -24,8 +24,8 @@ build --compilation_mode=opt
 build -c opt
 
 # Memory and performance
-build --local_ram_resources=HOST_RAM*0.8
-build --local_cpu_resources=HOST_CPUS*0.8
+build --local_resources=memory=HOST_RAM*0.8
+build --local_resources=cpu=HOST_CPUS*0.8
 
 # Show output for failed tests
 test --test_output=errors
