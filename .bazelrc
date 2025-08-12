@@ -1,0 +1,35 @@
+# Build configuration for Hunyuan3D
+
+# Use C++14 standard
+build --cxxopt=-std=c++14
+
+# CUDA configuration
+build --config=cuda
+
+# CUDA specific settings
+build:cuda --define=using_cuda=true
+build:cuda --define=using_cuda_nvcc=true
+build:cuda --crosstool_top=@local_config_cuda//crosstool:toolchain
+build:cuda --define=using_cuda_clang=false
+
+# Python configuration
+build --python_path=/usr/bin/python3
+
+# Docker build configuration
+build:docker --incompatible_enable_cc_toolchain_resolution
+build:docker --platforms=@io_bazel_rules_docker//platforms:linux_x86_64
+
+# Optimization flags
+build --compilation_mode=opt
+build -c opt
+
+# Memory and performance
+build --local_ram_resources=HOST_RAM*0.8
+build --local_cpu_resources=HOST_CPUS*0.8
+
+# Show output for failed tests
+test --test_output=errors
+
+# Show progress
+build --show_progress_rate_limit=5
+build --progress_report_interval=1

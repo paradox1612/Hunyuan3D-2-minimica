@@ -1,0 +1,172 @@
+load("@io_bazel_rules_docker//container:container.bzl", "container_image")
+load("@io_bazel_rules_docker//python:image.bzl", "py_image")
+load("@pip_deps//:requirements.bzl", "requirement")
+
+# Main Python application
+py_library(
+    name = "hunyuan3d_lib",
+    srcs = glob([
+        "*.py",
+        "hy3dgen/**/*.py",
+    ]),
+    data = [
+        "requirements.txt",
+        "//hy3dgen/texgen/custom_rasterizer:custom_rasterizer_extension",
+    ],
+    deps = [
+        requirement("diffusers"),
+        requirement("einops"),
+        requirement("opencv-python"),
+        requirement("numpy"),
+        requirement("torch"),
+        requirement("transformers"),
+        requirement("torchvision"),
+        requirement("omegaconf"),
+        requirement("tqdm"),
+        requirement("trimesh"),
+        requirement("pymeshlab"),
+        requirement("pygltflib"),
+        requirement("xatlas"),
+        requirement("accelerate"),
+        requirement("gradio"),
+        requirement("fastapi"),
+        requirement("uvicorn"),
+        requirement("rembg"),
+        requirement("onnxruntime"),
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# Custom rasterizer C++ extension
+cc_library(
+    name = "custom_rasterizer_lib",
+    srcs = glob([
+        "hy3dgen/texgen/custom_rasterizer/lib/custom_rasterizer_kernel/*.cpp",
+        "hy3dgen/texgen/custom_rasterizer/lib/custom_rasterizer_kernel/*.cu",
+    ]),
+    hdrs = glob([
+        "hy3dgen/texgen/custom_rasterizer/lib/custom_rasterizer_kernel/*.h",
+    ]),
+    copts = [
+        "-std=c++14",
+        "-DWITH_CUDA",
+    ],
+)
+
+# Python extension for custom rasterizer
+py_library(
+    name = "custom_rasterizer_extension",
+    srcs = glob([
+        "hy3dgen/texgen/custom_rasterizer/custom_rasterizer/*.py",
+    ]),
+    deps = [":custom_rasterizer_lib"],
+)
+
+# Main application binary
+py_binary(
+    name = "generate_mv_enhanced",
+    srcs = ["generate_mv_enhanced.py"],
+    deps = [":hunyuan3d_lib"],
+    main = "generate_mv_enhanced.py",
+)
+
+# API server binary
+py_binary(
+    name = "api_server",
+    srcs = ["api_server.py"],
+    deps = [":hunyuan3d_lib"],
+    main = "api_server.py",
+)
+
+# Docker container image
+container_image(
+    name = "hunyuan3d_image",
+    base = "@cuda_base//image",
+    cmd = ["python3", "generate_mv_enhanced.py"],
+    directory = "/app",
+    files = [
+        ":hunyuan3d_lib",
+        ":generate_mv_enhanced",
+        "requirements.txt",
+    ] + glob([
+        "assets/**/*",
+        "hy3dgen/**/*",
+    ]),
+    ports = ["8000"],
+    workdir = "/app",
+    # Install system dependencies
+    run_commands_tar = ":install_deps.tar",
+    env = {
+        "HY3DGEN_MODELS": "/app/model-cache",
+        "PYTHONPATH": "/app",
+    },
+)
+
+# System dependencies installation
+genrule(
+    name = "install_deps",
+    outs = ["install_deps.tar"],
+    cmd = """
+        mkdir -p tmp_install
+        cat > tmp_install/install.sh << 'EOF'
+#!/bin/bash
+set -e
+apt update && apt install -y python3 python3-pip git build-essential wget
+rm -rf /var/lib/apt/lists/*
+pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+pip install -r /app/requirements.txt
+pip3 install -U xformers --index-url https://download.pytorch.org/whl/cu128
+pip install flash-attn==2.8.0
+cd /app/hy3dgen/texgen/custom_rasterizer && python3 setup.py install
+python3 -c "
+from huggingface_hub import snapshot_download
+import os
+
+# Download Hunyuan3D-2mv (multi-view model)
+print('📥 Downloading Hunyuan3D-2mv...')
+snapshot_download(
+    repo_id='tencent/Hunyuan3D-2mv',
+    allow_patterns='hunyuan3d-dit-v2-mv/*',
+    local_dir='/app/model-cache',
+    local_dir_use_symlinks=False
+)
+
+# Download Hunyuan3D-2.1 (latest model)
+print('📥 Downloading Hunyuan3D-2.1...')
+snapshot_download(
+    repo_id='tencent/Hunyuan3D-2.1',
+    allow_patterns='hunyuan3d-dit-v2-1/*',
+    local_dir='/app/model-cache',
+    local_dir_use_symlinks=False
+)
+
+# Setup structures for both models
+for model_dir in ['hunyuan3d-dit-v2-mv', 'hunyuan3d-dit-v2-1']:
+    os.makedirs(f'/app/model-cache/{model_dir}/hunyuan3d-dit-v2-0', exist_ok=True)
+    for file in ['config.yaml', 'model.fp16.ckpt', 'model.fp16.safetensors']:
+        src = f'/app/model-cache/{model_dir}/{file}'
+        dst = f'/app/model-cache/{model_dir}/hunyuan3d-dit-v2-0/{file}'
+        if os.path.exists(src):
+            os.rename(src, dst)
+
+# Pre-download rembg model
+from hy3dgen.rembg import BackgroundRemover
+BackgroundRemover()
+print('✓ All models cached')
+"
+EOF
+        chmod +x tmp_install/install.sh
+        tar -cf $@ -C tmp_install install.sh
+    """,
+)
+
+# Build aliases for convenience
+alias(
+    name = "build",
+    actual = ":hunyuan3d_image",
+)
+
+alias(
+    name = "app",
+    actual = ":generate_mv_enhanced",
+)

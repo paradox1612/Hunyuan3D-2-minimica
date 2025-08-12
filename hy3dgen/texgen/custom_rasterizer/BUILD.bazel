@@ -1,0 +1,29 @@
+load("@pybind11_bazel//:build_defs.bzl", "pybind_extension")
+
+# Custom rasterizer C++ library
+cc_library(
+    name = "custom_rasterizer_kernel",
+    srcs = glob([
+        "lib/custom_rasterizer_kernel/*.cpp",
+        "lib/custom_rasterizer_kernel/*.cu",
+    ]),
+    hdrs = glob([
+        "lib/custom_rasterizer_kernel/*.h",
+    ]),
+    copts = [
+        "-std=c++14",
+        "-DWITH_CUDA",
+        "-DWITH_PYTHON",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+# Python extension module
+py_library(
+    name = "custom_rasterizer",
+    srcs = glob([
+        "custom_rasterizer/*.py",
+    ]),
+    deps = [":custom_rasterizer_kernel"],
+    visibility = ["//visibility:public"],
+)
