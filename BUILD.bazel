@@ -1,8 +1,7 @@
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_tarball")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
-load("@hunyuan3d_pypi//:requirements.bzl", "requirement")
 
-# Main Python application
+# Main Python application (without pip dependencies for now)
 py_library(
     name = "hunyuan3d_lib",
     srcs = glob([
@@ -11,28 +10,9 @@ py_library(
     ]),
     data = [
         "requirements.txt",
-    ],
-    deps = [
-        requirement("diffusers"),
-        requirement("einops"),
-        requirement("opencv-python"),
-        requirement("numpy"),
-        requirement("torch"),
-        requirement("transformers"),
-        requirement("torchvision"),
-        requirement("omegaconf"),
-        requirement("tqdm"),
-        requirement("trimesh"),
-        requirement("pymeshlab"),
-        requirement("pygltflib"),
-        requirement("xatlas"),
-        requirement("accelerate"),
-        requirement("gradio"),
-        requirement("fastapi"),
-        requirement("uvicorn"),
-        requirement("rembg"),
-        requirement("onnxruntime"),
-    ],
+    ] + glob([
+        "assets/**/*",
+    ]),
     visibility = ["//visibility:public"],
 )
 
@@ -80,13 +60,14 @@ py_binary(
 # Package application files
 pkg_tar(
     name = "app_layer",
-    srcs = [
-        ":hunyuan3d_lib",
-        ":generate_mv_enhanced",
+    srcs = glob([
+        "*.py",
         "requirements.txt",
-    ] + glob([
         "assets/**/*",
         "hy3dgen/**/*",
+    ], exclude = [
+        "**/*.pyc",
+        "**/__pycache__/**",
     ]),
     package_dir = "/app",
 )
