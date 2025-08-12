@@ -11,7 +11,6 @@ py_library(
     ]),
     data = [
         "requirements.txt",
-        "//hy3dgen/texgen/custom_rasterizer:custom_rasterizer_extension",
     ],
     deps = [
         requirement("diffusers"),
@@ -37,16 +36,16 @@ py_library(
     visibility = ["//visibility:public"],
 )
 
-# Custom rasterizer C++ extension
+# Custom rasterizer C++ extension (optional - only if files exist)
 cc_library(
     name = "custom_rasterizer_lib",
     srcs = glob([
         "hy3dgen/texgen/custom_rasterizer/lib/custom_rasterizer_kernel/*.cpp",
         "hy3dgen/texgen/custom_rasterizer/lib/custom_rasterizer_kernel/*.cu",
-    ]),
+    ], allow_empty = True),
     hdrs = glob([
         "hy3dgen/texgen/custom_rasterizer/lib/custom_rasterizer_kernel/*.h",
-    ]),
+    ], allow_empty = True),
     copts = [
         "-std=c++14",
         "-DWITH_CUDA",
@@ -58,7 +57,7 @@ py_library(
     name = "custom_rasterizer_extension",
     srcs = glob([
         "hy3dgen/texgen/custom_rasterizer/custom_rasterizer/*.py",
-    ]),
+    ], allow_empty = True),
     deps = [":custom_rasterizer_lib"],
 )
 

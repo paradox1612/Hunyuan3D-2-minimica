@@ -5,10 +5,10 @@ module(
 
 # Rules for Docker
 bazel_dep(name = "rules_oci", version = "1.7.4")
-bazel_dep(name = "rules_pkg", version = "0.10.1")
+bazel_dep(name = "rules_pkg", version = "1.0.1")
 
 # Rules for Python
-bazel_dep(name = "rules_python", version = "0.31.0")
+bazel_dep(name = "rules_python", version = "0.40.0")
 
 # Python toolchain
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
