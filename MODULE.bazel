@@ -5,26 +5,6 @@ module(
 
 # Rules for Docker
 bazel_dep(name = "rules_oci", version = "1.7.4")
-bazel_dep(name = "rules_pkg", version = "1.0.1")
-
-# Rules for Python
-bazel_dep(name = "rules_python", version = "0.40.0")
-
-# Don't use hermetic python to avoid root user issues
-# python = use_extension("@rules_python//python/extensions:python.bzl", "python")
-# python.toolchain(
-#     python_version = "3.10",
-#     is_default = True,
-# )
-
-# Python dependencies
-pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
-pip.parse(
-    hub_name = "hunyuan3d_pypi",
-    python_version = "3.10",
-    requirements_lock = "//:requirements.txt",
-)
-use_repo(pip, "hunyuan3d_pypi")
 
 # OCI base image
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
