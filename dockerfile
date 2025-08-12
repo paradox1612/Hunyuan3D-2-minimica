@@ -1,8 +1,10 @@
 FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu22.04
 
-# Install system dependencies
 RUN apt update && apt install -y \
     python3 python3-pip git build-essential wget \
+    libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 \
+    libxrender-dev libgomp1 libgstreamer1.0-0 \
+    libgstreamer-plugins-base1.0-0 libgstreamer-plugins-bad1.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
