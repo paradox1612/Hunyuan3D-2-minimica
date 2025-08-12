@@ -1,0 +1,69 @@
+FROM nvidia/cuda:12.1-devel-ubuntu22.04
+
+# Install system dependencies
+RUN apt update && apt install -y \
+    python3 python3-pip git build-essential wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+RUN pip install -r requirements.txt
+RUN pip3 install -U xformers --index-url https://download.pytorch.org/whl/cu128
+RUN pip install flash-attn==2.8.0
+
+# Copy source code
+COPY . .
+
+# Build custom rasterizer
+RUN cd hy3dgen/texgen/custom_rasterizer && python3 setup.py install
+
+# Pre-download BOTH models
+RUN python3 -c "
+from huggingface_hub import snapshot_download
+import os
+
+# Download Hunyuan3D-2mv (multi-view model)
+print('📥 Downloading Hunyuan3D-2mv...')
+snapshot_download(
+    repo_id='tencent/Hunyuan3D-2mv',
+    allow_patterns='hunyuan3d-dit-v2-mv/*',
+    local_dir='./model-cache',
+    local_dir_use_symlinks=False
+)
+
+# Download Hunyuan3D-2.1 (latest model)
+print('📥 Downloading Hunyuan3D-2.1...')
+snapshot_download(
+    repo_id='tencent/Hunyuan3D-2.1',
+    allow_patterns='hunyuan3d-dit-v2-1/*',
+    local_dir='./model-cache',
+    local_dir_use_symlinks=False
+)
+
+# Setup structures for both models
+for model_dir in ['hunyuan3d-dit-v2-mv', 'hunyuan3d-dit-v2-1']:
+    os.makedirs(f'./model-cache/{model_dir}/hunyuan3d-dit-v2-0', exist_ok=True)
+    for file in ['config.yaml', 'model.fp16.ckpt', 'model.fp16.safetensors']:
+        src = f'./model-cache/{model_dir}/{file}'
+        dst = f'./model-cache/{model_dir}/hunyuan3d-dit-v2-0/{file}'
+        if os.path.exists(src):
+            os.rename(src, dst)
+
+# Pre-download rembg model
+from hy3dgen.rembg import BackgroundRemover
+BackgroundRemover()
+print('✓ All models cached')
+"
+
+# Set environment variables
+ENV HY3DGEN_MODELS=/app/model-cache
+
+# Expose port (if needed for API)
+EXPOSE 8000
+
+# Default command
+CMD ["python3", "generate_mv_enhanced.py"]
