@@ -17,7 +17,8 @@ RUN pip install flash-attn==2.8.0.post2
 
 # Copy source code
 COPY . .
-
+ENV TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6"
+ENV CUDA_HOME=/usr/local/cuda
 # Build custom rasterizer
 RUN cd hy3dgen/texgen/custom_rasterizer && python3 setup.py install
 
