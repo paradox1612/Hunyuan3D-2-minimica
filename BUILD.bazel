@@ -1,5 +1,5 @@
-load("@io_bazel_rules_docker//container:container.bzl", "container_image")
-load("@io_bazel_rules_docker//python:image.bzl", "py_image")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_tarball")
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load("@pip_deps//:requirements.bzl", "requirement")
 
 # Main Python application
@@ -78,13 +78,10 @@ py_binary(
     main = "api_server.py",
 )
 
-# Docker container image
-container_image(
-    name = "hunyuan3d_image",
-    base = "@cuda_base//image",
-    cmd = ["python3", "generate_mv_enhanced.py"],
-    directory = "/app",
-    files = [
+# Package application files
+pkg_tar(
+    name = "app_layer",
+    srcs = [
         ":hunyuan3d_lib",
         ":generate_mv_enhanced",
         "requirements.txt",
@@ -92,14 +89,28 @@ container_image(
         "assets/**/*",
         "hy3dgen/**/*",
     ]),
-    ports = ["8000"],
+    package_dir = "/app",
+)
+
+# Docker container image using OCI
+oci_image(
+    name = "hunyuan3d_image",
+    base = "@cuda_base",
+    tars = [":app_layer"],
+    entrypoint = ["python3", "generate_mv_enhanced.py"],
+    exposed_ports = ["8000"],
     workdir = "/app",
-    # Install system dependencies
-    run_commands_tar = ":install_deps.tar",
     env = {
         "HY3DGEN_MODELS": "/app/model-cache",
         "PYTHONPATH": "/app",
     },
+)
+
+# Create tarball for loading into Docker
+oci_tarball(
+    name = "hunyuan3d_tarball",
+    image = ":hunyuan3d_image",
+    repo_tags = ["hunyuan3d:latest"],
 )
 
 # System dependencies installation
