@@ -12,8 +12,10 @@ build:cuda --define=using_cuda_nvcc=true
 build:cuda --crosstool_top=@local_config_cuda//crosstool:toolchain
 build:cuda --define=using_cuda_clang=false
 
-# Python configuration
+# Python configuration - use system python to avoid root issues
 build --python_path=/usr/bin/python3
+build --action_env=PYTHONPATH
+build --@rules_python//python/config_settings:bootstrap_impl=system
 
 # Docker build configuration
 build:docker --incompatible_enable_cc_toolchain_resolution

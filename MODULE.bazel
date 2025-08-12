@@ -10,9 +10,12 @@ bazel_dep(name = "rules_pkg", version = "1.0.1")
 # Rules for Python
 bazel_dep(name = "rules_python", version = "0.40.0")
 
-# Python toolchain
+# Python toolchain (use system python to avoid root user issues)
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
-python.toolchain(python_version = "3.10")
+python.toolchain(
+    python_version = "3.10",
+    is_default = True,
+)
 
 # Python dependencies
 pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
