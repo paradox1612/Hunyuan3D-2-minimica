@@ -12,7 +12,7 @@ WORKDIR /app
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
-RUN pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+#RUN pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 RUN pip install -r requirements.txt
 RUN pip3 install -U xformers --index-url https://download.pytorch.org/whl/cu128
 RUN pip install flash-attn==2.8.0.post2
