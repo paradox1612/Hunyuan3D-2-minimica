@@ -1,6 +1,10 @@
 import os
 import torch
+torch.cuda.set_device(0)
 from PIL import Image
+
+# Set CUDA environment before any imports
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 # Performance optimizations - MUST be before other imports
 import torch.backends.cudnn as cudnn
@@ -12,10 +16,14 @@ try:
 except:
     print("⚠ Flash attention not available")
 
+print("🚀 Loading model...")
+
 from hy3dgen.rembg import BackgroundRemover
 from hy3dgen.shapegen import Hunyuan3DDiTFlowMatchingPipeline
 
-def generate_3d_mesh(image_paths, output_path="output.glb", model_version="2mv"):
+print("🚀 loaded model...")
+
+def generate_3d_mesh(image_paths, output_path="output.glb", model_version="2.1", device='cuda', dtype=torch.float16, use_safetensors=False, num_inference_steps=20, octree_resolution=380, num_chunks=20000, generator=torch.manual_seed(12345), output_type='trimesh'):
     """
     Generate 3D mesh from multi-view images
     
@@ -25,30 +33,22 @@ def generate_3d_mesh(image_paths, output_path="output.glb", model_version="2mv")
         model_version (str): "2mv" for multi-view model or "2.1" for latest model
     """
     
-    # Set model path
-    os.environ['HY3DGEN_MODELS'] = '/workspace/pro/Hunyuan3D-2/model-kp/hunyuan3d-download'
-    
-    # Select model based on version
-    if model_version == "2mv":
-        model_name = 'hunyuan3d-dit-v2-mv'
-        print("🔧 Using Hunyuan3D-2mv (Multi-View optimized)")
-    elif model_version == "2.1":
-        model_name = 'hunyuan3d-dit-v2-1'
-        print("🔧 Using Hunyuan3D-2.1 (Latest)")
-    else:
-        raise ValueError("model_version must be '2mv' or '2.1'")
+    ckpt_path = "./models/hunyuan3d-dit-v2-1/hunyuan3d-dit-v2-1/model.fp16.ckpt"
+    config_path = "./models/hunyuan3d-dit-v2-1/hunyuan3d-dit-v2-1/config.yaml"
     
     # Clear GPU cache
     torch.cuda.empty_cache()
-    
-    # Load model
-    print(f"🚀 Loading {model_name}...")
-    pipeline = Hunyuan3DDiTFlowMatchingPipeline.from_pretrained(
-        model_name,
-        use_safetensors=True,
-        device='cuda',
-        torch_dtype=torch.float16
-    )
+    torch.set_default_tensor_type('torch.cuda.HalfTensor')
+    # Load model - VRAM only
+    print(f"🚀 Loading model to VRAM...")
+    with torch.cuda.device(0):
+        pipeline = Hunyuan3DDiTFlowMatchingPipeline.from_single_file(
+            ckpt_path=ckpt_path,
+            config_path=config_path,
+            device='cuda',
+            dtype=torch.float16,
+            use_safetensors=False
+        )
     
     # Initialize background remover
     rembg = BackgroundRemover()
@@ -77,11 +77,11 @@ def generate_3d_mesh(image_paths, output_path="output.glb", model_version="2mv")
     with torch.inference_mode():
         mesh = pipeline(
             image=images,
-            num_inference_steps=20,
-            octree_resolution=380,
-            num_chunks=20000,
-            generator=torch.manual_seed(12345),
-            output_type='trimesh'
+            num_inference_steps=num_inference_steps,
+            octree_resolution=octree_resolution,
+            num_chunks=num_chunks,
+            generator=generator,
+            output_type=output_type
         )[0]
     
     # Export
@@ -96,23 +96,3 @@ def generate_multiview_mesh(image_paths, output_path="mv_output.glb"):
 def generate_latest_mesh(image_paths, output_path="latest_output.glb"):
     """Generate mesh using latest Hunyuan3D-2.1 model"""
     return generate_3d_mesh(image_paths, output_path, model_version="2.1")
-
-# if __name__ == "__main__":
-#     # Multi-view image paths
-#     mv_image_paths = {
-#         "front": 'assets/example_mv_images/1/front.png',
-#         "back": 'assets/example_mv_images/1/back.png',
-#         "left": 'assets/example_mv_images/1/left.png'
-#     }
-    
-#     # Single image path (for 2.1 model)
-#     single_image_path = 'assets/example_mv_images/1/front.png'
-    
-#     print("🔄 Testing Multi-View model (2mv)...")
-#     generate_multiview_mesh(mv_image_paths, "demo_mv_output.glb")
-    
-#     print("\n🔄 Testing Latest model (2.1) with single image...")
-#     generate_latest_mesh(single_image_path, "demo_latest_output.glb")
-    
-#     print("\n🔄 Testing Latest model (2.1) with multi-view...")
-#     generate_latest_mesh(mv_image_paths, "demo_latest_mv_output.glb")
